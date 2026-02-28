@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบจองโต๊ะโรงอาหาร</title>
+
+<style>
+body {
+    font-family: 'Kanit', sans-serif;
+    background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+    padding: 20px;
+    text-align: center;
+}
+
+.container {
+    max-width: 650px;
+    margin: auto;
+    background: white;
+    padding: 25px;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+h2 { margin-bottom: 10px; }
+
+input {
+    padding: 12px;
+    width: 80%;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    text-align: center;
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.table-card {
+    padding: 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+    font-weight: bold;
+    white-space: pre-line;
+}
+
+.available {
+    background-color: #e8f8f5;
+    border: 2px solid #2ecc71;
+    color: #27ae60;
+}
+
+.available:hover {
+    transform: scale(1.05);
+}
+
+.booked {
+    background-color: #fdecea;
+    border: 2px solid #e74c3c;
+    color: #c0392b;
+    cursor: not-allowed;
+}
+
+.selected {
+    border: 3px solid #3498db !important;
+    background-color: #ebf5fb;
+}
+
+button {
+    margin-top: 15px;
+    padding: 10px 25px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    color: white;
+}
+
+.confirm-btn { background: #3498db; }
+.cancel-btn { background: #f39c12; }
+.reset-btn { background: #7f8c8d; }
+
+button:hover { opacity: 0.9; }
+
+.status {
+    margin-top: 15px;
+    font-weight: bold;
+    min-height: 25px;
+}
+
+.success { color: #27ae60; }
+.error { color: #e74c3c; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>🍴 ระบบจองโต๊ะโรงอาหาร</h2>
+    <p>กรุณากรอกรหัสนักเรียน (ตัวเลข 5 หลัก)</p>
+
+    <input type="text" id="studentId" maxlength="5" inputmode="numeric" placeholder="เช่น 12345">
+
+    <div class="grid-container" id="tableGrid"></div>
+
+    <div class="status" id="statusMessage"></div>
+
+    <button class="confirm-btn" onclick="confirmBooking()">ยืนยันการจอง</button>
+    <button class="cancel-btn" onclick="cancelBooking()">ยกเลิกการจองของฉัน</button>
+    <button class="reset-btn" onclick="resetSystem()">ล้างข้อมูลทั้งหมด (Admin)</button>
+</div>
+
+<script>
+const totalTables = 9;
+let selectedTable = null;
+
+let tableStatus = JSON.parse(localStorage.getItem('tableBooking')) 
+    || Array(totalTables).fill(null);
+
+function renderTables() {
+    const grid = document.getElementById('tableGrid');
+    grid.innerHTML = '';
+
+    tableStatus.forEach((student, index) => {
+        const div = document.createElement('div');
+        div.className = 'table-card';
+
+        if (student) {
+            div.classList.add('booked');
+            const masked = "xxxx" + student.slice(-2);
+            div.innerText = `โต๊ะที่ ${index + 1}\n❌ จองโดย: ${masked}`;
+        } else {
+            div.classList.add('available');
+            div.innerText = `โต๊ะที่ ${index + 1}\n✅ ว่าง`;
+            div.onclick = () => selectTable(index);
+        }
+
+        if (selectedTable === index) {
+            div.classList.add('selected');
+        }
+
+        grid.appendChild(div);
+    });
+}
+
+function selectTable(index) {
+    selectedTable = index;
+    renderTables();
+    setStatus(`คุณกำลังเลือกโต๊ะที่ ${index + 1}`, "success");
+}
+
+function confirmBooking() {
+    const studentId = document.getElementById('studentId').value.trim();
+
+    if (!/^\d{5}$/.test(studentId)) {
+        setStatus("กรุณากรอกรหัสนักเรียนเป็นตัวเลข 5 หลัก", "error");
+        return;
+    }
+
+    if (selectedTable === null) {
+        setStatus("กรุณาเลือกโต๊ะก่อนทำการจอง", "error");
+        return;
+    }
+
+    if (tableStatus.includes(studentId)) {
+        setStatus("รหัสนักเรียนนี้มีการจองโต๊ะไปแล้ว", "error");
+        return;
+    }
+
+    if (tableStatus[selectedTable] !== null) {
+        setStatus("โต๊ะนี้ถูกจองไปแล้ว", "error");
+        return;
+    }
+
+    tableStatus[selectedTable] = studentId;
+    localStorage.setItem('tableBooking', JSON.stringify(tableStatus));
+    selectedTable = null;
+    renderTables();
+    setStatus("🎉 การจองสำเร็จ!", "success");
+}
+
+function cancelBooking() {
+    const studentId = document.getElementById('studentId').value.trim();
+
+    if (!/^\d{5}$/.test(studentId)) {
+        setStatus("กรุณากรอกรหัสนักเรียนให้ถูกต้อง", "error");
+        return;
+    }
+
+    const index = tableStatus.indexOf(studentId);
+
+    if (index === -1) {
+        setStatus("ไม่พบการจองของรหัสนี้", "error");
+        return;
+    }
+
+    tableStatus[index] = null;
+    localStorage.setItem('tableBooking', JSON.stringify(tableStatus));
+    renderTables();
+    setStatus("ยกเลิกการจองเรียบร้อยแล้ว", "success");
+}
+
+function resetSystem() {
+    if (confirm("ต้องการล้างข้อมูลทั้งหมดหรือไม่?")) {
+        localStorage.removeItem('tableBooking');
+        tableStatus = Array(totalTables).fill(null);
+        selectedTable = null;
+        renderTables();
+        setStatus("ล้างข้อมูลทั้งหมดแล้ว", "success");
+    }
+}
+
+function setStatus(message, type) {
+    const status = document.getElementById('statusMessage');
+    status.innerText = message;
+    status.className = `status ${type}`;
+}
+
+renderTables();
+</script>
+
+</body>
+</html>
